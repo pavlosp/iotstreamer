@@ -1,0 +1,10 @@
+version: "2"
+
+services:
+  streamer:
+    build: ./streamer
+    privileged: true
+    restart: on-failure
+    network_mode: host
+    labels:
+      io.balena.features.dbus: 1

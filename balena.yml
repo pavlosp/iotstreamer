@@ -1,0 +1,17 @@
+name: iotstreamer
+type: sw.application
+description: >-
+  A simple, single-container audio streaming configuration for balenaCloud.
+post-provisioning: >-
+  ## Welcome to IoTStreamer
+
+  Your device is pulling the application architecture. Once loaded, it will broadcast as an Airplay device on your network.
+assets:
+  repository:
+    type: blob.asset
+    data:
+      url: 'https://github.com/pavlosp/iotstreamer'
+  logo:
+    type: blob.asset
+    data:
+      url: 'raw.githubusercontent.com/pavlosp/iotstreamer/master/logo.png'
