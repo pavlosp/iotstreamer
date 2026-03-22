@@ -18,6 +18,27 @@ ctl.!default {
 }
 EOF
 
+# PulseAudio daemon stabilization
+cat <<EOF > /etc/pulse/daemon.conf
+use-pid-file = no
+exit-idle-time = -1
+avoid-resampling = yes
+flat-volumes = no
+default-script-file = /etc/pulse/default.pa
+EOF
+
+cat <<EOF > /etc/pulse/client.conf
+default-server = unix:/var/run/pulse/pulseaudio.socket
+autospawn = no
+EOF
+
+# Bind the UNIX socket natively with no auth required for containerized routing
+echo "load-module module-native-protocol-unix auth-anonymous=true socket=/var/run/pulse/pulseaudio.socket" >> /etc/pulse/default.pa
+
+# Disable container-unfriendly modules
+sed -i 's/load-module module-console-kit/#load-module module-console-kit/' /etc/pulse/default.pa || true
+sed -i 's/load-module module-jackdbus-detect/#load-module module-jackdbus-detect/' /etc/pulse/default.pa || true
+
 # Allow hardware to be initialized by the kernel (crucial for slow USB DACs)
 echo "Waiting for audio hardware to initialize..."
 sleep 5
