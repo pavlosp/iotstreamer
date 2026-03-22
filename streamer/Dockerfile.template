@@ -7,6 +7,8 @@ ENV DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host/run/dbus/system_bus_socket
 ENV UDEV=on
 
 RUN install_packages \
+  udev \
+  mawk \
   alsa-utils \
   pulseaudio \
   pulseaudio-utils \
@@ -16,6 +18,7 @@ RUN install_packages \
   ladspa-sdk \
   supervisor
 
+COPY 95-balena-audio.rules /etc/udev/rules.d/95-balena-audio.rules
 COPY start.sh /usr/src/start.sh
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 

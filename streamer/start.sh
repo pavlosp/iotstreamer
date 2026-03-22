@@ -18,9 +18,42 @@ ctl.!default {
 }
 EOF
 
-# Wait for PulseAudio to be fully initialized before applying runtime configs
-# Actually, since we use --system, we will append to system.pa before supervisor starts it.
-echo "load-module module-ladspa-sink sink_name=eq sink_properties=device.description=\"Equalizer\" plugin=mbeq_1197 label=mbeq control=$SOUND_EQ" >> /etc/pulse/system.pa
+# Allow hardware to be initialized by the kernel (crucial for slow USB DACs)
+echo "Waiting for audio hardware to initialize..."
+sleep 5
+
+# Identify the best hardware audio sink automatically (USB > DAC > HDA > Built-in)
+BCM2835_CARDS=($(cat /proc/asound/cards | mawk -F '\[|\]:' '/bcm2835/ && NR%2==1 {gsub(/ /, "", $0); print $2}'))
+USB_CARDS=($(cat /proc/asound/cards | mawk -F '\[|\]:' '/usb/ && NR%2==1 {gsub(/ /, "", $0); print $2}'))
+DAC_CARD=$(cat /proc/asound/cards | mawk -F '\[|\]:' '/dac|DAC|Dac/ && NR%2==1 {gsub(/ /, "", $0); print $2}')
+HDA_CARD=$(cat /proc/asound/cards | mawk -F '\[|\]:' '/hda-intel/ && NR%2==1 {gsub(/ /, "", $0); print $2}')
+
+PA_SINK=""
+if [[ -n "$USB_CARDS" ]]; then
+  PA_SINK="alsa_output.${USB_CARDS[0]}.analog-stereo"
+elif [[ -n "$DAC_CARD" ]]; then
+  PA_SINK="alsa_output.dac.stereo-fallback"
+elif [[ -n "$HDA_CARD" ]]; then
+  PA_SINK="alsa_output.hda-intel.analog-stereo"
+elif [[ -n "$BCM2835_CARDS" ]]; then
+  if [[ "${BCM2835_CARDS[@]}" =~ "bcm2835-alsa" ]]; then
+    PA_SINK="alsa_output.bcm2835-alsa.stereo-fallback" # Older kernels
+  else
+    PA_SINK="alsa_output.bcm2835-jack.stereo-fallback" # Newer kernels
+  fi
+fi
+
+if [[ -n "$PA_SINK" ]]; then
+  # Inject the master sink preference directly into pulse system configs
+  # Create equalizer targeting the specific hardware sink
+  echo "set-default-sink $PA_SINK" >> /etc/pulse/system.pa
+  echo "load-module module-ladspa-sink sink_name=eq sink_master=$PA_SINK sink_properties=device.description=\"Equalizer\" plugin=mbeq_1197 label=mbeq control=$SOUND_EQ" >> /etc/pulse/system.pa
+else
+  # Fallback gracefully if no parsed cards match
+  echo "load-module module-ladspa-sink sink_name=eq sink_properties=device.description=\"Equalizer\" plugin=mbeq_1197 label=mbeq control=$SOUND_EQ" >> /etc/pulse/system.pa
+fi
+
+# Route everything to EQ and set max hardware volume for unattenuated audio
 echo "set-default-sink eq" >> /etc/pulse/system.pa
 echo "set-sink-volume eq 65536" >> /etc/pulse/system.pa
 
