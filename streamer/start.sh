@@ -33,11 +33,11 @@ autospawn = no
 EOF
 
 # Bind the UNIX socket natively with no auth required for containerized routing
-echo "load-module module-native-protocol-unix auth-anonymous=true socket=/var/run/pulse/pulseaudio.socket" >> /etc/pulse/default.pa
+grep -q "auth-anonymous=true" /etc/pulse/default.pa || echo "load-module module-native-protocol-unix auth-anonymous=true socket=/var/run/pulse/pulseaudio.socket" >> /etc/pulse/default.pa
 
 # Disable container-unfriendly modules
-sed -i 's/load-module module-console-kit/#load-module module-console-kit/' /etc/pulse/default.pa || true
-sed -i 's/load-module module-jackdbus-detect/#load-module module-jackdbus-detect/' /etc/pulse/default.pa || true
+sed -i 's/^load-module module-console-kit/#load-module module-console-kit/' /etc/pulse/default.pa || true
+sed -i 's/^load-module module-jackdbus-detect/#load-module module-jackdbus-detect/' /etc/pulse/default.pa || true
 
 # Allow hardware to be initialized by the kernel (crucial for slow USB DACs)
 echo "Waiting for audio hardware to initialize..."
@@ -64,6 +64,12 @@ elif [[ -n "$BCM2835_CARDS" ]]; then
   fi
 fi
 
+# Clear old configuration lines if the container gracefully restarted
+sed -i '/sink_name=eq/d' /etc/pulse/default.pa
+sed -i '/set-default-sink eq/d' /etc/pulse/default.pa
+sed -i '/set-sink-volume eq/d' /etc/pulse/default.pa
+sed -i "/set-default-sink $PA_SINK/d" /etc/pulse/default.pa
+
 if [[ -n "$PA_SINK" ]]; then
   # Inject the master sink preference directly into pulse system configs
   # Create equalizer targeting the specific hardware sink
@@ -77,6 +83,9 @@ fi
 # Route everything to EQ and set max hardware volume for unattenuated audio
 echo "set-default-sink eq" >> /etc/pulse/default.pa
 echo "set-sink-volume eq 65536" >> /etc/pulse/default.pa
+
+# Clean up stale sockets explicitly
+rm -f /var/run/pulse/pulseaudio.socket*
 
 echo "Starting configuration for Streamer..."
 exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf
