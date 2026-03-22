@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
-mkdir -p /var/run/pulse
+# Remove any internal conflicting dbus or avahi PIDs
+rm -rf /var/run/dbus/* /var/run/avahi-daemon/*
+mkdir -p /var/run/dbus /var/run/pulse
 chown root:root /var/run/pulse
 
 # Default values

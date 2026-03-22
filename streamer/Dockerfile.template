@@ -1,23 +1,113 @@
-ARG BALENA_ARCH=%%BALENA_ARCH%%
-FROM balenalib/$BALENA_ARCH-debian:bullseye-run
+# ==========================================
+# STAGE 1: Builder Source Compilation
+# ==========================================
+FROM balenalib/%%BALENA_ARCH%%-debian:bullseye-build AS builder
+WORKDIR /build
 
+# Compile dependencies
+RUN install_packages \
+    build-essential \
+    git \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    libpopt-dev \
+    libconfig-dev \
+    libasound2-dev \
+    libavahi-client-dev \
+    libssl-dev \
+    libsoxr-dev \
+    libpulse-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    libavformat-dev \
+    libsodium-dev \
+    libgcrypt20-dev \
+    libplist-dev \
+    libplist-utils \
+    xxd \
+    uuid-dev
+
+# 1. Build ALAC Decoder
+RUN git clone https://github.com/mikebrady/alac.git && \
+    cd alac && \
+    autoreconf -fi && \
+    ./configure && \
+    make -j$(nproc) && \
+    make install
+
+# 2. Build NQPTP (Precision Time Protocol for AirPlay 2)
+RUN git clone https://github.com/mikebrady/nqptp.git && \
+    cd nqptp && \
+    autoreconf -fi && \
+    ./configure --with-systemd-startup && \
+    make -j$(nproc) && \
+    make install
+
+# 3. Build Shairport Sync v4 (AirPlay 2)
+RUN git clone https://github.com/mikebrady/shairport-sync.git && \
+    cd shairport-sync && \
+    autoreconf -fi && \
+    ./configure \
+        --sysconfdir=/etc \
+        --with-alsa \
+        --with-pa \
+        --with-soxr \
+        --with-avahi \
+        --with-ssl=openssl \
+        --with-airplay-2 \
+        --with-apple-alac \
+        --with-popt \
+        --with-metadata && \
+    make -j$(nproc) && \
+    make install
+
+
+# ==========================================
+# STAGE 2: Slim Runtime Image
+# ==========================================
+FROM balenalib/%%BALENA_ARCH%%-debian:bullseye-run
 WORKDIR /usr/src
 
-ENV DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host/run/dbus/system_bus_socket
 ENV UDEV=on
 
+# Native Runtime Libraries
 RUN install_packages \
-  udev \
-  mawk \
-  alsa-utils \
-  pulseaudio \
-  pulseaudio-utils \
-  shairport-sync \
-  libasound2-plugins \
-  swh-plugins \
-  ladspa-sdk \
-  supervisor
+    udev \
+    dbus \
+    avahi-daemon \
+    mawk \
+    alsa-utils \
+    pulseaudio \
+    pulseaudio-utils \
+    libasound2-plugins \
+    swh-plugins \
+    ladspa-sdk \
+    supervisor \
+    libpopt0 \
+    libconfig9 \
+    libavahi-client3 \
+    libssl1.1 \
+    libsoxr0 \
+    libavcodec58 \
+    libavutil56 \
+    libavformat58 \
+    libsodium23 \
+    libgcrypt20 \
+    libplist3 \
+    libuuid1
 
+# Copy compiled AirPlay 2 binaries from the builder stage
+COPY --from=builder /usr/local/bin/shairport-sync /usr/local/bin/
+COPY --from=builder /usr/local/bin/nqptp /usr/local/bin/
+COPY --from=builder /usr/local/lib/libalac.* /usr/local/lib/
+COPY --from=builder /etc/shairport-sync.conf.sample /etc/shairport-sync.conf
+
+# Link newly injected shared libraries
+RUN ldconfig
+
+# Inject startup and config scripts
 COPY 95-balena-audio.rules /etc/udev/rules.d/95-balena-audio.rules
 COPY start.sh /usr/src/start.sh
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
