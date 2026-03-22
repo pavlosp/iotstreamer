@@ -46,16 +46,16 @@ fi
 if [[ -n "$PA_SINK" ]]; then
   # Inject the master sink preference directly into pulse system configs
   # Create equalizer targeting the specific hardware sink
-  echo "set-default-sink $PA_SINK" >> /etc/pulse/system.pa
-  echo "load-module module-ladspa-sink sink_name=eq sink_master=$PA_SINK sink_properties=device.description=\"Equalizer\" plugin=mbeq_1197 label=mbeq control=$SOUND_EQ" >> /etc/pulse/system.pa
+  echo "set-default-sink $PA_SINK" >> /etc/pulse/default.pa
+  echo "load-module module-ladspa-sink sink_name=eq sink_master=$PA_SINK sink_properties=device.description=\"Equalizer\" plugin=mbeq_1197 label=mbeq control=$SOUND_EQ" >> /etc/pulse/default.pa
 else
   # Fallback gracefully if no parsed cards match
-  echo "load-module module-ladspa-sink sink_name=eq sink_properties=device.description=\"Equalizer\" plugin=mbeq_1197 label=mbeq control=$SOUND_EQ" >> /etc/pulse/system.pa
+  echo "load-module module-ladspa-sink sink_name=eq sink_properties=device.description=\"Equalizer\" plugin=mbeq_1197 label=mbeq control=$SOUND_EQ" >> /etc/pulse/default.pa
 fi
 
 # Route everything to EQ and set max hardware volume for unattenuated audio
-echo "set-default-sink eq" >> /etc/pulse/system.pa
-echo "set-sink-volume eq 65536" >> /etc/pulse/system.pa
+echo "set-default-sink eq" >> /etc/pulse/default.pa
+echo "set-sink-volume eq 65536" >> /etc/pulse/default.pa
 
 echo "Starting configuration for Streamer..."
 exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf
