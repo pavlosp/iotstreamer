@@ -3,8 +3,20 @@ set -e
 
 # Remove any internal conflicting dbus or avahi PIDs
 rm -rf /var/run/dbus/* /var/run/avahi-daemon/*
-mkdir -p /var/run/dbus /var/run/pulse
+mkdir -p /var/run/dbus /var/run/pulse /etc/dbus-1/system.d
 chown root:root /var/run/pulse
+
+# Allow root to claim PulseAudio DBus names on the system bus
+cat <<EOF > /etc/dbus-1/system.d/pulseaudio-root.conf
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy user="root">
+    <allow own="org.pulseaudio.Server"/>
+    <allow own="org.PulseAudio1"/>
+  </policy>
+</busconfig>
+EOF
 
 # Default values
 export SOUND_DEVICE_NAME=${SOUND_DEVICE_NAME:-"Raspberry Pi Streamer"}
