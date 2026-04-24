@@ -50,14 +50,15 @@ RUN git clone https://github.com/mikebrady/shairport-sync.git && \
     cd shairport-sync && \
     autoreconf -fi && \
     ./configure \
-        --sysconfdir=/etc \
-        --with-alsa \
-        --with-soxr \
-        --with-avahi \
-        --with-ssl=openssl \
-        --with-airplay-2 \
-        --with-apple-alac \
-        --with-metadata && \
+    --sysconfdir=/etc \
+    --with-alsa \
+    --with-pulseaudio \
+    --with-soxr \
+    --with-avahi \
+    --with-ssl=openssl \
+    --with-airplay-2 \
+    --with-apple-alac \
+    --with-metadata && \
     make -j$(nproc) && \
     make install
 
